@@ -1,0 +1,21 @@
+HKCR
+{
+	Scripting.ScriptEngine = s 'ScriptEngine Class'
+	{
+		CLSID = s '{CE3D5E24-E53D-4EF4-BB96-8C9AE966CB1F}'
+	}
+	NoRemove CLSID
+	{
+		ForceRemove {CE3D5E24-E53D-4EF4-BB96-8C9AE966CB1F} = s 'ScriptEngine Class'
+		{
+			ProgID = s 'Scripting.ScriptEngine'
+			VersionIndependentProgID = s 'Scripting.ScriptEngine'
+			ForceRemove 'Programmable'
+			InprocServer32 = s '%MODULE%'
+			{
+				val ThreadingModel = s 'Apartment'
+			}
+			'TypeLib' = s '{8062E631-FD53-4BB1-9631-24690B0A8846}'
+		}
+	}
+}

@@ -1,0 +1,6 @@
+*.ncb
+*.user
+*_i.c
+*_i.h
+Output/
+

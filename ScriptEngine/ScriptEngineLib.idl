@@ -1,0 +1,58 @@
+// ScriptEngineLib.idl : IDL source for ScriptEngineLib
+//
+
+// This file will be processed by the MIDL tool to
+// produce the type library (ScriptEngineLib.tlb) and marshalling code.
+
+import "oaidl.idl";
+import "ocidl.idl";
+
+[
+	uuid(8062E631-FD53-4BB1-9631-24690B0A8846),
+	version(1.0),
+	helpstring("ScriptEngineLib 1.0 Type Library")
+]
+library ScriptEngineLibLib
+{
+	importlib("stdole2.tlb");
+
+	//----------------------------------------------------------------------
+	//
+	//----------------------------------------------------------------------
+
+	interface IScriptEngine;
+
+	//----------------------------------------------------------------------
+	//
+	//----------------------------------------------------------------------
+
+	[
+		object,
+		uuid(528B31E2-CA67-4B48-BE5F-BF546F3E1909),
+		dual,
+		nonextensible,
+		helpstring("IScriptEngine Interface"),
+		pointer_default(unique)
+	]
+	interface IScriptEngine : IDispatch{
+		[id(1)] HRESULT Clear();
+		[id(2)] HRESULT Evaluate([in] BSTR ScriptText, [in] BSTR Language, [out,retval] VARIANT* Result);
+		[id(3)] HRESULT Execute([in] BSTR ScriptText, [in] BSTR Language);
+		[id(4)] HRESULT Import([in] BSTR Path, [in] BSTR Name, [in] BSTR Language);
+		[id(5)] HRESULT ImportScript([in] BSTR ScriptText, [in] BSTR Context, [in] BSTR Name, [in] BSTR Language);
+	};
+
+	//----------------------------------------------------------------------
+	//
+	//----------------------------------------------------------------------
+
+	[
+		uuid(CE3D5E24-E53D-4EF4-BB96-8C9AE966CB1F),
+		helpstring("ScriptEngine Class")
+	]
+	coclass ScriptEngine
+	{
+		[default] interface IScriptEngine;
+	};
+
+};
