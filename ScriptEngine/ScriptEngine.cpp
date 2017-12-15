@@ -11,6 +11,7 @@ CScriptEngine::CScriptEngine() :
 {
 	m_Names.Create();
 	m_Values.Create();
+
 }
 
 STDMETHODIMP CScriptEngine::InterfaceSupportsErrorInfo(REFIID riid)
@@ -28,12 +29,14 @@ STDMETHODIMP CScriptEngine::InterfaceSupportsErrorInfo(REFIID riid)
 	return S_FALSE;
 }
 
-// IActiveScriptSite
-
-STDMETHODIMP CScriptEngine::AddItem()
+HRESULT CScriptEngine::FinalConstruct()
 {
+	HRESULT hr = S_OK;
+	CHECKHR(SetItem(CComBSTR("Engine"), &CComVariant((IDispatch*) this)));
 	return S_OK;
 }
+
+// IActiveScriptSite
 
 STDMETHODIMP CScriptEngine::GetLCID(LCID *plcid)
 {
@@ -53,13 +56,10 @@ STDMETHODIMP CScriptEngine::GetItemInfo(LPCOLESTR pstrName, DWORD dwReturnMask, 
 		{
 			if (dwReturnMask & SCRIPTINFO_IUNKNOWN)
 			{
-				IDispatch* pIDispatch = m_Values.GetAt(idx);
-
-				if (ppiunkItem)
-				{
-					*ppiunkItem = NULL;
-					CHECKHR(pIDispatch->QueryInterface(IID_IUnknown, (void**) ppiunkItem));
-				}
+				*ppiunkItem = NULL;
+				VARIANT& Value = m_Values.GetAt(idx);
+				if (Value.vt != VT_DISPATCH) return TYPE_E_ELEMENTNOTFOUND;
+				CHECKHR(V_DISPATCH(&Value)->QueryInterface(IID_IUnknown, (void**) ppiunkItem));
 			}
 
 			return S_OK;
@@ -116,7 +116,8 @@ STDMETHODIMP CScriptEngine::OnScriptError(IActiveScriptError *pIActiveScriptErro
 		m_ErrorString.Append(ei.bstrDescription);
 	}
 
-	wprintf(L"%s\n", (BSTR) m_ErrorString);
+	OutputDebugStringW((BSTR) m_ErrorString);
+	//wprintf(L"%s\n", (BSTR) m_ErrorString);
 
 	m_Error = ei.scode;
 
@@ -359,7 +360,7 @@ STDMETHODIMP CScriptEngine::ImportScript(BSTR scriptText, BSTR Context, BSTR nam
     LPCOLESTR pstrItemName = (LPCOLESTR) NULL;
     IUnknown *punkContext = NULL;
     LPCOLESTR pstrDelimiter = NULL;
-    DWORD dwSourceContextCookie = m_Names.GetCount();
+    DWORD dwSourceContextCookie = 0;
     ULONG ulStartingLineNumber = 0;
     DWORD dwFlags = SCRIPTTEXT_ISPERSISTENT;
 	//DWORD dwFlags = SCRIPTTEXT_ISVISIBLE;
@@ -368,16 +369,48 @@ STDMETHODIMP CScriptEngine::ImportScript(BSTR scriptText, BSTR Context, BSTR nam
 	EXCEPINFO ei = { };
 	CComPtr<IActiveScript> spIActiveScript;
 
+	LONG Index = -1;
+	CHECKHR(SetItem(name, NULL, &Index));
+	dwSourceContextCookie = Index;
+
 	CHECKHR(m_Names.Add(name));
-	//CHECKHR(m_Values.Add((IDispatch*) NULL));
 
 	CHECKHR(ParseScriptText(pstrCode, pstrLanguage, pstrItemName, punkContext, pstrDelimiter, dwSourceContextCookie, ulStartingLineNumber, dwFlags, &result, &ei, &spIActiveScript));
 
 	CComPtr<IDispatch> spIDispatch;
 	CHECKHR(spIActiveScript->GetScriptDispatch(NULL, &spIDispatch));
 
-	//CHECKHR(m_Values.SetAt(dwSourceContextCookie, spIDispatch.Detach()));
-	CHECKHR(m_Values.Add(spIDispatch.Detach()));
+	CHECKHR(SetItem(name, &CComVariant((IDispatch*) spIDispatch)));
 
 	return hr;
 }
+
+STDMETHODIMP CScriptEngine::SetItem(BSTR Name, VARIANT* Object, LONG* Index)
+{
+	HRESULT hr = S_OK;
+
+	if (Index) *Index = -1;
+
+	for (ULONG idx = 0; idx < m_Names.GetCount() && idx < m_Values.GetCount(); idx++)
+	{
+		if (wcscmp(m_Names.GetAt(idx), Name) == 0)
+		{
+			if (Index) *Index = (LONG) idx;
+			m_Values.SetAt(idx, Object ? *Object : CComVariant());
+			return S_OK;
+		}
+	}
+
+	if (Index) *Index = m_Names.GetCount();
+	m_Names.Add(Name);
+	m_Values.Add(Object ? *Object : CComVariant());
+
+	return S_OK;
+}
+
+STDMETHODIMP CScriptEngine::SetWindow(OLE_HANDLE hWnd)
+{
+	m_hWnd = (HWND) hWnd;
+	return S_OK;
+}
+

@@ -38,10 +38,7 @@ END_COM_MAP()
 
 	DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
+	HRESULT FinalConstruct();
 
 	void FinalRelease()
 	{
@@ -82,17 +79,18 @@ public:
 protected:
 	HWND m_hWnd;
 	CComSafeArray<BSTR> m_Names;
-	CComSafeArray<IDispatch*> m_Values;
+	CComSafeArray<VARIANT> m_Values;
 	HRESULT m_Error;
 	CComBSTR m_ErrorString;
 
 public:
-	STDMETHOD(AddItem)();
 	STDMETHOD(Clear)();
 	STDMETHOD(Evaluate)(BSTR ScriptText, BSTR Language, VARIANT* Result);
 	STDMETHOD(Execute)(BSTR ScriptText, BSTR Language);
 	STDMETHOD(Import)(BSTR Path, BSTR Name, BSTR Language);
 	STDMETHOD(ImportScript)(BSTR ScriptText, BSTR Context, BSTR Name, BSTR Language);
+	STDMETHOD(SetItem)(BSTR Name, VARIANT* Object = NULL, LONG* Index = NULL);
+	STDMETHOD(SetWindow)(OLE_HANDLE hWnd);
 
 };
 

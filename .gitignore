@@ -2,5 +2,6 @@
 *.user
 *_i.c
 *_i.h
+*.suo
 Output/
 
