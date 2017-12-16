@@ -19,6 +19,7 @@ class ATL_NO_VTABLE CScriptEngine :
 	public CComCoClass<CScriptEngine, &CLSID_ScriptEngine>,
 	public ISupportErrorInfo,
 	public IActiveScriptSite,
+	public IActiveScriptSiteWindow,
 	public IDispatchImpl<IScriptEngine, &IID_IScriptEngine, &LIBID_ScriptEngineLibLib, /*wMajor =*/ 1, /*wMinor =*/ 0>
 {
 public:
@@ -31,6 +32,7 @@ BEGIN_COM_MAP(CScriptEngine)
 	COM_INTERFACE_ENTRY(IDispatch)
 	COM_INTERFACE_ENTRY(ISupportErrorInfo)
 	COM_INTERFACE_ENTRY(IActiveScriptSite)
+	COM_INTERFACE_ENTRY(IActiveScriptSiteWindow)
 END_COM_MAP()
 
 // ISupportsErrorInfo
