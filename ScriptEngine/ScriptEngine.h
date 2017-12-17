@@ -84,6 +84,7 @@ protected:
 	CComSafeArray<VARIANT> m_Values;
 	HRESULT m_Error;
 	CComBSTR m_ErrorString;
+	CComPtr<IActiveScript> m_CurrentScript;
 
 public:
 	STDMETHOD(Clear)();

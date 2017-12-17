@@ -117,6 +117,7 @@ STDMETHODIMP CScriptEngine::OnScriptError(IActiveScriptError *pIActiveScriptErro
 	}
 
 	OutputDebugStringW((BSTR) m_ErrorString);
+	OutputDebugStringW(L"\r\n");
 	//wprintf(L"%s\n", (BSTR) m_ErrorString);
 
 	m_Error = ei.scode;
@@ -205,9 +206,12 @@ STDMETHODIMP CScriptEngine::ParseScriptText(
 		CHECKHR(spIActiveScript->AddNamedItem(name, dwFlags));
 	}
 
+	m_CurrentScript = spIActiveScript;
+
 	CComPtr<IActiveScriptParse> spIActiveScriptParse;
 	CHECKHR(spIActiveScript->QueryInterface(&spIActiveScriptParse));
 	CHECKHR(spIActiveScriptParse->InitNew());
+
 
 	CComVariant result;
 	EXCEPINFO ei = { };
@@ -227,6 +231,8 @@ STDMETHODIMP CScriptEngine::ParseScriptText(
 	{
 		*ppIActiveScript = spIActiveScript.Detach();
 	}
+
+	m_CurrentScript = NULL;
 
 	return S_OK;
 }
@@ -355,25 +361,26 @@ STDMETHODIMP CScriptEngine::ImportScript(BSTR scriptText, BSTR Context, BSTR nam
 {
 	HRESULT hr = S_OK;
 
+	LONG Index = -1;
+	CHECKHR(SetItem(name, NULL, &Index));
+
 	LPCOLESTR pstrCode = (LPCOLESTR) scriptText;
 	LPCOLESTR pstrLanguage = (LPCOLESTR) Language;
     LPCOLESTR pstrItemName = (LPCOLESTR) NULL;
     IUnknown *punkContext = NULL;
     LPCOLESTR pstrDelimiter = NULL;
-    DWORD dwSourceContextCookie = 0;
+	DWORD dwSourceContextCookie = Index;
     ULONG ulStartingLineNumber = 0;
-    DWORD dwFlags = SCRIPTTEXT_ISPERSISTENT;
+    DWORD dwFlags = SCRIPTTEXT_ISPERSISTENT | SCRIPTTEXT_ISVISIBLE;
+	//DWORD dwFlags = SCRIPTTEXT_ISPERSISTENT;
 	//DWORD dwFlags = SCRIPTTEXT_ISVISIBLE;
 	//DWORD dwFlags = 0; // SCRIPTTEXT_ISEXPRESSION;
 	CComVariant result;
 	EXCEPINFO ei = { };
 	CComPtr<IActiveScript> spIActiveScript;
 
-	LONG Index = -1;
-	CHECKHR(SetItem(name, NULL, &Index));
-	dwSourceContextCookie = Index;
 
-	CHECKHR(m_Names.Add(name));
+	//CHECKHR(m_Names.Add(name));
 
 	CHECKHR(ParseScriptText(pstrCode, pstrLanguage, pstrItemName, punkContext, pstrDelimiter, dwSourceContextCookie, ulStartingLineNumber, dwFlags, &result, &ei, &spIActiveScript));
 
@@ -391,7 +398,7 @@ STDMETHODIMP CScriptEngine::SetItem(BSTR Name, VARIANT* Object, LONG* Index)
 
 	if (Index) *Index = -1;
 
-	for (ULONG idx = 0; idx < m_Names.GetCount() && idx < m_Values.GetCount(); idx++)
+	for (ULONG idx = 0; idx < m_Names.GetCount(); idx++)
 	{
 		if (wcscmp(m_Names.GetAt(idx), Name) == 0)
 		{
@@ -404,6 +411,12 @@ STDMETHODIMP CScriptEngine::SetItem(BSTR Name, VARIANT* Object, LONG* Index)
 	if (Index) *Index = m_Names.GetCount();
 	m_Names.Add(Name);
 	m_Values.Add(Object ? *Object : CComVariant());
+
+	if (m_CurrentScript)
+	{
+		DWORD dwFlags = SCRIPTITEM_ISPERSISTENT | SCRIPTITEM_ISVISIBLE | SCRIPTITEM_GLOBALMEMBERS;
+		CHECKHR(m_CurrentScript->AddNamedItem(Name, dwFlags));
+	}
 
 	return S_OK;
 }
