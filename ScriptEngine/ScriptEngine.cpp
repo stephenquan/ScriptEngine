@@ -116,11 +116,16 @@ STDMETHODIMP CScriptEngine::OnScriptError(IActiveScriptError *pIActiveScriptErro
 		m_ErrorString.Append(ei.bstrDescription);
 	}
 
+	m_Error = ei.scode;
+
 	OutputDebugStringW((BSTR) m_ErrorString);
 	OutputDebugStringW(L"\r\n");
 	//wprintf(L"%s\n", (BSTR) m_ErrorString);
 
-	m_Error = ei.scode;
+	if (m_hWnd)
+	{
+		::MessageBox(m_hWnd, (BSTR) m_ErrorString, L"Error", MB_ICONERROR | MB_OK);
+	}
 
 	return S_OK;
 }
@@ -156,13 +161,32 @@ STDMETHODIMP CScriptEngine::Clear()
 {
 	HRESULT hr = S_OK;
 
+	for (ULONG idx = 0; idx < m_Names.GetCount(); idx++)
+	{
+		VARIANT& value = m_Values.GetAt(idx);
+
+		if (value.vt == VT_DISPATCH)
+		{
+			CComPtr<IActiveScript> spIActiveScript;
+			hr = V_DISPATCH(&value)->QueryInterface(IID_IActiveScript, (void**) &spIActiveScript);
+			if (SUCCEEDED(hr))
+			{
+				CHECKHR(spIActiveScript->SetScriptState(SCRIPTSTATE_CLOSED));
+				spIActiveScript = NULL;
+			}
+		}
+
+		CHECKHR(VariantClear(&value));
+	}
+
 	CHECKHR(m_Names.Destroy());
 	CHECKHR(m_Values.Destroy());
 	CHECKHR(m_Names.Create());
 	CHECKHR(m_Values.Create());
 
+	::CoFreeUnusedLibrariesEx(0, 0);
+	::CoFreeUnusedLibrariesEx(0, 0);
 	return S_OK;
-
 }
 
 STDMETHODIMP CScriptEngine::ParseScriptText(
@@ -261,6 +285,8 @@ STDMETHODIMP CScriptEngine::Evaluate(BSTR ScriptText, BSTR Language, VARIANT* Re
 	CComPtr<IActiveScript> spIActiveScript;
 	CHECKHR(ParseScriptText(pstrCode, pstrLanguage, pstrItemName, punkContext, pstrDelimiter, dwSourceContextCookie, ulStartingLineNumber, dwFlags, Result, &ei, &spIActiveScript));
 
+	CHECKHR(spIActiveScript->SetScriptState(SCRIPTSTATE_CLOSED));
+
 	return hr;
 }
 
@@ -283,6 +309,8 @@ STDMETHODIMP CScriptEngine::Execute(BSTR ScriptText, BSTR Language)
 	EXCEPINFO ei = { };
 	CComPtr<IActiveScript> spIActiveScript;
 	CHECKHR(ParseScriptText(pstrCode, pstrLanguage, pstrItemName, punkContext, pstrDelimiter, dwSourceContextCookie, ulStartingLineNumber, dwFlags, &result, &ei, &spIActiveScript));
+
+	CHECKHR(spIActiveScript->SetScriptState(SCRIPTSTATE_CLOSED));
 
 	return hr;
 }
@@ -372,15 +400,9 @@ STDMETHODIMP CScriptEngine::ImportScript(BSTR scriptText, BSTR Context, BSTR nam
 	DWORD dwSourceContextCookie = Index;
     ULONG ulStartingLineNumber = 0;
     DWORD dwFlags = SCRIPTTEXT_ISPERSISTENT | SCRIPTTEXT_ISVISIBLE;
-	//DWORD dwFlags = SCRIPTTEXT_ISPERSISTENT;
-	//DWORD dwFlags = SCRIPTTEXT_ISVISIBLE;
-	//DWORD dwFlags = 0; // SCRIPTTEXT_ISEXPRESSION;
 	CComVariant result;
 	EXCEPINFO ei = { };
 	CComPtr<IActiveScript> spIActiveScript;
-
-
-	//CHECKHR(m_Names.Add(name));
 
 	CHECKHR(ParseScriptText(pstrCode, pstrLanguage, pstrItemName, punkContext, pstrDelimiter, dwSourceContextCookie, ulStartingLineNumber, dwFlags, &result, &ei, &spIActiveScript));
 
