@@ -465,24 +465,17 @@ STDMETHODIMP CScriptEngine::RunScript(BSTR Path, BSTR Language)
 	DWORD dwFlags = SCRIPTTEXT_ISVISIBLE;
 	CComVariant result;
 
-	CComPtr<IXMLDOMDocument> spDOM;
-	CHECKHR(spDOM.CoCreateInstance(OLESTR("Microsoft.XMLDOM")));
-	VARIANT_BOOL success = VARIANT_FALSE;
-	CHECKHR(spDOM->loadXML(CComBSTR("<Alpha><Beta/></Alpha>"), &success));
-
-	CHECKHR(SetItem(CComBSTR("Doc"), &CComVariant((IDispatch*) spDOM)));
-
 	EXCEPINFO ei = { };
 	CComPtr<IActiveScript> spIActiveScript;
 	CHECKHR(ParseScriptText(pstrCode, pstrLanguage, pstrItemName, punkContext, pstrDelimiter, dwSourceContextCookie, ulStartingLineNumber, dwFlags, &result, &ei, &spIActiveScript));
 
-	CHECKHR(spIActiveScript->Close());
+	if (spIActiveScript)
+	{
+		CHECKHR(spIActiveScript->Close());
+		spIActiveScript = NULL;
+	}
 
 	CHECKHR(Clear());
-
-	spDOM = NULL;
-
-	spIActiveScript = NULL;
 
 	::CoFreeUnusedLibrariesEx(0, NULL);
 	::CoFreeUnusedLibrariesEx(0, NULL);
