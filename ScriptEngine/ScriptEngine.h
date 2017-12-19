@@ -88,10 +88,13 @@ protected:
 
 public:
 	STDMETHOD(Clear)();
+	STDMETHOD(CoFree)();
 	STDMETHOD(Evaluate)(BSTR ScriptText, BSTR Language, VARIANT* Result);
 	STDMETHOD(Execute)(BSTR ScriptText, BSTR Language);
 	STDMETHOD(Import)(BSTR Path, BSTR Name, BSTR Language);
 	STDMETHOD(ImportScript)(BSTR ScriptText, BSTR Context, BSTR Name, BSTR Language);
+	STDMETHOD(LoadScript)(BSTR Path, BSTR* ScriptText);
+	STDMETHOD(RunScript)(BSTR Path, BSTR Language);
 	STDMETHOD(SetItem)(BSTR Name, VARIANT* Object = NULL, LONG* Index = NULL);
 	STDMETHOD(SetWindow)(OLE_HANDLE hWnd);
 

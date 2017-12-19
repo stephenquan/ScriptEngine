@@ -171,7 +171,8 @@ STDMETHODIMP CScriptEngine::Clear()
 			hr = V_DISPATCH(&value)->QueryInterface(IID_IActiveScript, (void**) &spIActiveScript);
 			if (SUCCEEDED(hr))
 			{
-				CHECKHR(spIActiveScript->SetScriptState(SCRIPTSTATE_CLOSED));
+				//CHECKHR(spIActiveScript->SetScriptState(SCRIPTSTATE_CLOSED));
+				CHECKHR(spIActiveScript->Close());
 				spIActiveScript = NULL;
 			}
 		}
@@ -186,6 +187,13 @@ STDMETHODIMP CScriptEngine::Clear()
 
 	::CoFreeUnusedLibrariesEx(0, 0);
 	::CoFreeUnusedLibrariesEx(0, 0);
+	return S_OK;
+}
+
+STDMETHODIMP CScriptEngine::CoFree()
+{
+	::CoFreeUnusedLibrariesEx(0, NULL);
+	::CoFreeUnusedLibrariesEx(0, NULL);
 	return S_OK;
 }
 
@@ -226,7 +234,8 @@ STDMETHODIMP CScriptEngine::ParseScriptText(
 	for (ULONG idx = 0; idx < m_Names.GetCount(); idx++)
 	{
 		BSTR name = m_Names.GetAt(idx);
-		DWORD dwFlags = SCRIPTITEM_ISPERSISTENT | SCRIPTITEM_ISVISIBLE | SCRIPTITEM_GLOBALMEMBERS;
+		//DWORD dwFlags = SCRIPTITEM_ISVISIBLE | SCRIPTITEM_GLOBALMEMBERS;
+		DWORD dwFlags = SCRIPTITEM_ISVISIBLE;
 		CHECKHR(spIActiveScript->AddNamedItem(name, dwFlags));
 	}
 
@@ -285,7 +294,12 @@ STDMETHODIMP CScriptEngine::Evaluate(BSTR ScriptText, BSTR Language, VARIANT* Re
 	CComPtr<IActiveScript> spIActiveScript;
 	CHECKHR(ParseScriptText(pstrCode, pstrLanguage, pstrItemName, punkContext, pstrDelimiter, dwSourceContextCookie, ulStartingLineNumber, dwFlags, Result, &ei, &spIActiveScript));
 
-	CHECKHR(spIActiveScript->SetScriptState(SCRIPTSTATE_CLOSED));
+	CHECKHR(spIActiveScript->Close());
+
+	spIActiveScript = NULL;
+
+	::CoFreeUnusedLibraries();
+	::CoFreeUnusedLibraries();
 
 	return hr;
 }
@@ -310,7 +324,10 @@ STDMETHODIMP CScriptEngine::Execute(BSTR ScriptText, BSTR Language)
 	CComPtr<IActiveScript> spIActiveScript;
 	CHECKHR(ParseScriptText(pstrCode, pstrLanguage, pstrItemName, punkContext, pstrDelimiter, dwSourceContextCookie, ulStartingLineNumber, dwFlags, &result, &ei, &spIActiveScript));
 
-	CHECKHR(spIActiveScript->SetScriptState(SCRIPTSTATE_CLOSED));
+	CHECKHR(spIActiveScript->Close());
+
+	::CoFreeUnusedLibrariesEx(0, NULL);
+	::CoFreeUnusedLibrariesEx(0, NULL);
 
 	return hr;
 }
@@ -321,6 +338,51 @@ STDMETHODIMP CScriptEngine::Import(BSTR Path, BSTR Name, BSTR Language)
 {
 	HRESULT hr = S_OK;
 	BOOL ok = TRUE;
+
+	CComBSTR ScriptText;
+	CHECKHR(LoadScript(Path, &ScriptText));
+
+	return ImportScript((BSTR) ScriptText, Path, Name, Language);
+}
+
+//
+
+STDMETHODIMP CScriptEngine::ImportScript(BSTR scriptText, BSTR Context, BSTR name, BSTR Language)
+{
+	HRESULT hr = S_OK;
+
+	LONG Index = -1;
+	CHECKHR(SetItem(name, NULL, &Index));
+
+	LPCOLESTR pstrCode = (LPCOLESTR) scriptText;
+	LPCOLESTR pstrLanguage = (LPCOLESTR) Language;
+    LPCOLESTR pstrItemName = (LPCOLESTR) NULL;
+    IUnknown *punkContext = NULL;
+    LPCOLESTR pstrDelimiter = NULL;
+	DWORD dwSourceContextCookie = Index;
+    ULONG ulStartingLineNumber = 0;
+    DWORD dwFlags = SCRIPTTEXT_ISVISIBLE;
+	CComVariant result;
+	EXCEPINFO ei = { };
+	CComPtr<IActiveScript> spIActiveScript;
+
+	CHECKHR(ParseScriptText(pstrCode, pstrLanguage, pstrItemName, punkContext, pstrDelimiter, dwSourceContextCookie, ulStartingLineNumber, dwFlags, &result, &ei, &spIActiveScript));
+
+	CComPtr<IDispatch> spIDispatch;
+	CHECKHR(spIActiveScript->GetScriptDispatch(NULL, &spIDispatch));
+
+	CHECKHR(SetItem(name, &CComVariant((IDispatch*) spIDispatch)));
+
+	return hr;
+}
+
+STDMETHODIMP CScriptEngine::LoadScript(BSTR Path, BSTR* ScriptText)
+{
+	HRESULT hr = S_OK;
+	BOOL ok = TRUE;
+
+	if (!ScriptText) return E_INVALIDARG;
+	*ScriptText = NULL;
 
 	LPCWSTR lpFileName = Path;
 	DWORD dwDesiredAccess = GENERIC_READ;
@@ -380,38 +442,52 @@ STDMETHODIMP CScriptEngine::Import(BSTR Path, BSTR Name, BSTR Language)
 
 	::MultiByteToWideChar(CodePage, 0, (LPCSTR) pBytesA, nLenA, (BSTR) bytesW, nLenW);
 
-	return ImportScript((BSTR) bytesW, Path, Name, Language);
+	*ScriptText = bytesW.Detach();
+
+	return S_OK;
 }
 
-//
-
-STDMETHODIMP CScriptEngine::ImportScript(BSTR scriptText, BSTR Context, BSTR name, BSTR Language)
+STDMETHODIMP CScriptEngine::RunScript(BSTR Path, BSTR Language)
 {
 	HRESULT hr = S_OK;
+	BOOL ok = TRUE;
 
-	LONG Index = -1;
-	CHECKHR(SetItem(name, NULL, &Index));
+	CComBSTR ScriptText;
+	CHECKHR(LoadScript(Path, &ScriptText));
 
-	LPCOLESTR pstrCode = (LPCOLESTR) scriptText;
+	LPCOLESTR pstrCode = (LPCOLESTR) ScriptText;
 	LPCOLESTR pstrLanguage = (LPCOLESTR) Language;
     LPCOLESTR pstrItemName = (LPCOLESTR) NULL;
     IUnknown *punkContext = NULL;
     LPCOLESTR pstrDelimiter = NULL;
-	DWORD dwSourceContextCookie = Index;
+    DWORD dwSourceContextCookie = 0;
     ULONG ulStartingLineNumber = 0;
-    DWORD dwFlags = SCRIPTTEXT_ISPERSISTENT | SCRIPTTEXT_ISVISIBLE;
+	DWORD dwFlags = SCRIPTTEXT_ISVISIBLE;
 	CComVariant result;
+
+	CComPtr<IXMLDOMDocument> spDOM;
+	CHECKHR(spDOM.CoCreateInstance(OLESTR("Microsoft.XMLDOM")));
+	VARIANT_BOOL success = VARIANT_FALSE;
+	CHECKHR(spDOM->loadXML(CComBSTR("<Alpha><Beta/></Alpha>"), &success));
+
+	CHECKHR(SetItem(CComBSTR("Doc"), &CComVariant((IDispatch*) spDOM)));
+
 	EXCEPINFO ei = { };
 	CComPtr<IActiveScript> spIActiveScript;
-
 	CHECKHR(ParseScriptText(pstrCode, pstrLanguage, pstrItemName, punkContext, pstrDelimiter, dwSourceContextCookie, ulStartingLineNumber, dwFlags, &result, &ei, &spIActiveScript));
 
-	CComPtr<IDispatch> spIDispatch;
-	CHECKHR(spIActiveScript->GetScriptDispatch(NULL, &spIDispatch));
+	CHECKHR(spIActiveScript->Close());
 
-	CHECKHR(SetItem(name, &CComVariant((IDispatch*) spIDispatch)));
+	CHECKHR(Clear());
 
-	return hr;
+	spDOM = NULL;
+
+	spIActiveScript = NULL;
+
+	::CoFreeUnusedLibrariesEx(0, NULL);
+	::CoFreeUnusedLibrariesEx(0, NULL);
+
+	return S_OK;
 }
 
 STDMETHODIMP CScriptEngine::SetItem(BSTR Name, VARIANT* Object, LONG* Index)
@@ -436,7 +512,8 @@ STDMETHODIMP CScriptEngine::SetItem(BSTR Name, VARIANT* Object, LONG* Index)
 
 	if (m_CurrentScript)
 	{
-		DWORD dwFlags = SCRIPTITEM_ISPERSISTENT | SCRIPTITEM_ISVISIBLE | SCRIPTITEM_GLOBALMEMBERS;
+		//DWORD dwFlags = SCRIPTITEM_ISVISIBLE | SCRIPTITEM_GLOBALMEMBERS;
+		DWORD dwFlags = SCRIPTITEM_ISVISIBLE;
 		CHECKHR(m_CurrentScript->AddNamedItem(Name, dwFlags));
 	}
 
