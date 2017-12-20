@@ -44,6 +44,7 @@ library ScriptEngineLibLib
 		[id(7)] HRESULT RunScript([in] BSTR Path, [in] BSTR Language);
 		[id(8)] HRESULT SetItem([in] BSTR Name, [in] VARIANT* Object, [out,retval] LONG* Index);
 		[id(9)] HRESULT SetWindow([in] OLE_HANDLE hWnd);
+		[id(10)] HRESULT AddGlobal([in] IDispatch* item);
 	};
 
 	//----------------------------------------------------------------------

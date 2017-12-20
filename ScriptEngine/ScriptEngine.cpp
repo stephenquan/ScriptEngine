@@ -7,11 +7,11 @@
 // CScriptEngine
 
 CScriptEngine::CScriptEngine() :
-	m_hWnd(NULL)
+	m_hWnd(NULL),
+	m_Globals(NULL)
 {
 	m_Names.Create();
 	m_Values.Create();
-
 }
 
 STDMETHODIMP CScriptEngine::InterfaceSupportsErrorInfo(REFIID riid)
@@ -32,8 +32,17 @@ STDMETHODIMP CScriptEngine::InterfaceSupportsErrorInfo(REFIID riid)
 HRESULT CScriptEngine::FinalConstruct()
 {
 	HRESULT hr = S_OK;
-	CHECKHR(SetItem(CComBSTR("Engine"), &CComVariant((IDispatch*) this)));
+	m_Globals = new CGlobals();
+	//CHECKHR(SetItem(CComBSTR("Engine"), &CComVariant((IDispatch*) this)));
+	CHECKHR(SetItem(CComBSTR("Globals"), &CComVariant(m_Globals)));
+	CHECKHR(AddGlobal(this));
 	return S_OK;
+}
+
+void CScriptEngine::FinalRelease()
+{
+	m_Globals->Release();
+	m_Globals = NULL;
 }
 
 // IActiveScriptSite
@@ -184,9 +193,11 @@ STDMETHODIMP CScriptEngine::Clear()
 	CHECKHR(m_Values.Destroy());
 	CHECKHR(m_Names.Create());
 	CHECKHR(m_Values.Create());
+	CHECKHR(m_Globals->Clear());
 
 	::CoFreeUnusedLibrariesEx(0, 0);
 	::CoFreeUnusedLibrariesEx(0, 0);
+
 	return S_OK;
 }
 
@@ -236,6 +247,10 @@ STDMETHODIMP CScriptEngine::ParseScriptText(
 		BSTR name = m_Names.GetAt(idx);
 		//DWORD dwFlags = SCRIPTITEM_ISVISIBLE | SCRIPTITEM_GLOBALMEMBERS;
 		DWORD dwFlags = SCRIPTITEM_ISVISIBLE;
+		if (_wcsicmp(name, L"Globals") == 0)
+		{
+			dwFlags |=  SCRIPTITEM_GLOBALMEMBERS;
+		}
 		CHECKHR(spIActiveScript->AddNamedItem(name, dwFlags));
 	}
 
@@ -371,7 +386,8 @@ STDMETHODIMP CScriptEngine::ImportScript(BSTR scriptText, BSTR Context, BSTR nam
 	CComPtr<IDispatch> spIDispatch;
 	CHECKHR(spIActiveScript->GetScriptDispatch(NULL, &spIDispatch));
 
-	CHECKHR(SetItem(name, &CComVariant((IDispatch*) spIDispatch)));
+	//CHECKHR(SetItem(name, &CComVariant((IDispatch*) spIDispatch)));
+	CHECKHR(AddGlobal(spIDispatch));
 
 	return hr;
 }

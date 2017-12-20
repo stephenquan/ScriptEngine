@@ -227,15 +227,19 @@
 				</FileConfiguration>
 			</File>
 			<File
+				RelativePath=".\Globals.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\ScriptEngine.cpp"
 				>
 			</File>
 			<File
-				RelativePath=".\ScriptEngineLib.cpp"
+				RelativePath=".\ScriptEngine.def"
 				>
 			</File>
 			<File
-				RelativePath=".\ScriptEngine.def"
+				RelativePath=".\ScriptEngineLib.cpp"
 				>
 			</File>
 			<File
@@ -273,6 +277,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\Globals.h"
+				>
+			</File>
+			<File
 				RelativePath=".\Resource.h"
 				>
 			</File>
@@ -295,11 +303,11 @@
 			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}"
 			>
 			<File
-				RelativePath=".\ScriptEngine.rgs"
+				RelativePath=".\ScriptEngine.rc"
 				>
 			</File>
 			<File
-				RelativePath=".\ScriptEngine.rc"
+				RelativePath=".\ScriptEngine.rgs"
 				>
 			</File>
 			<File
