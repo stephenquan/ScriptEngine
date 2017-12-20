@@ -20,7 +20,7 @@ class ATL_NO_VTABLE CScriptEngine :
 	public ISupportErrorInfo,
 	public IActiveScriptSite,
 	public IActiveScriptSiteWindow,
-	public IDispatchImpl<IScriptEngine, &IID_IScriptEngine, &LIBID_ScriptEngineLibLib, /*wMajor =*/ 1, /*wMinor =*/ 0>
+	public IDispatchImpl<IScriptEngine, &IID_IScriptEngine, &LIBID_ScriptEngineLib, /*wMajor =*/ 1, /*wMinor =*/ 0>
 {
 public:
 	CScriptEngine();
@@ -77,25 +77,31 @@ public:
 		IActiveScript** ppIActiveScript);
 	STDMETHOD(AddGlobal)(IDispatch* item) { return m_Globals->AddItem(item); }
 
+	static CComBSTR VBScript;
+	static CComBSTR JScript;
+
 protected:
 	HWND m_hWnd;
 	CComSafeArray<BSTR> m_Names;
 	CComSafeArray<VARIANT> m_Values;
+	CComSafeArray<BSTR> m_Contexts;
+	CAtlMap<BSTR, DWORD> m_Flags;
 	HRESULT m_Error;
 	CComBSTR m_ErrorString;
 	CComPtr<IActiveScript> m_CurrentScript;
 	CGlobals* m_Globals;
 
 public:
+	STDMETHOD(SetContext)(BSTR Context, DWORD* dwContext = NULL);
 	STDMETHOD(Clear)();
 	STDMETHOD(CoFree)();
 	STDMETHOD(Evaluate)(BSTR ScriptText, BSTR Language, VARIANT* Result);
 	STDMETHOD(Execute)(BSTR ScriptText, BSTR Language);
 	STDMETHOD(Import)(BSTR Path, BSTR Name, BSTR Language);
-	STDMETHOD(ImportScript)(BSTR ScriptText, BSTR Context, BSTR Name, BSTR Language);
+	STDMETHOD(ImportScript)(BSTR ScriptText, BSTR Context, BSTR Name, BSTR Language, DWORD dwNameFlags = SCRIPTTEXT_ISVISIBLE);
 	STDMETHOD(LoadScript)(BSTR Path, BSTR* ScriptText);
 	STDMETHOD(RunScript)(BSTR Path, BSTR Language);
-	STDMETHOD(SetItem)(BSTR Name, VARIANT* Object = NULL, LONG* Index = NULL);
+	STDMETHOD(SetItem)(BSTR Name, VARIANT* Object = NULL, DWORD dwFlags = SCRIPTTEXT_ISVISIBLE, LONG* Index = NULL);
 	STDMETHOD(SetWindow)(OLE_HANDLE hWnd);
 
 };

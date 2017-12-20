@@ -6,12 +6,16 @@
 
 // CScriptEngine
 
+CComBSTR CScriptEngine::VBScript("VBScript");
+CComBSTR CScriptEngine::JScript("JScript");
+
 CScriptEngine::CScriptEngine() :
 	m_hWnd(NULL),
 	m_Globals(NULL)
 {
 	m_Names.Create();
 	m_Values.Create();
+	m_Contexts.Create();
 }
 
 STDMETHODIMP CScriptEngine::InterfaceSupportsErrorInfo(REFIID riid)
@@ -34,7 +38,8 @@ HRESULT CScriptEngine::FinalConstruct()
 	HRESULT hr = S_OK;
 	m_Globals = new CGlobals();
 	//CHECKHR(SetItem(CComBSTR("Engine"), &CComVariant((IDispatch*) this)));
-	CHECKHR(SetItem(CComBSTR("Globals"), &CComVariant(m_Globals)));
+	DWORD dwFlags = SCRIPTITEM_ISVISIBLE | SCRIPTITEM_GLOBALMEMBERS;
+	CHECKHR(SetItem(CComBSTR("Globals"), &CComVariant(m_Globals), dwFlags));
 	CHECKHR(AddGlobal(this));
 	return S_OK;
 }
@@ -46,6 +51,38 @@ void CScriptEngine::FinalRelease()
 }
 
 // IActiveScriptSite
+
+STDMETHODIMP CScriptEngine::SetContext(BSTR Context, DWORD* dwContext)
+{
+	HRESULT hr = S_OK;
+
+	if (!Context || !*Context)
+	{
+		if (dwContext) *dwContext = 0;
+		return S_OK;
+	}
+
+	for (ULONG idx = 0; idx < m_Contexts.GetCount(); idx++)
+	{
+		if (_wcsicmp(Context, m_Contexts.GetAt(idx)) == 0)
+		{
+			if (dwContext)
+			{
+				*dwContext = idx + 256;
+			}
+			return S_OK;
+		}
+	}
+
+	if (dwContext)
+	{
+		*dwContext = m_Contexts.GetCount() + 256;
+	}
+
+	CHECKHR(m_Contexts.Add(Context));
+
+	return S_OK;
+}
 
 STDMETHODIMP CScriptEngine::GetLCID(LCID *plcid)
 {
@@ -191,8 +228,11 @@ STDMETHODIMP CScriptEngine::Clear()
 
 	CHECKHR(m_Names.Destroy());
 	CHECKHR(m_Values.Destroy());
+	CHECKHR(m_Contexts.Destroy());
 	CHECKHR(m_Names.Create());
 	CHECKHR(m_Values.Create());
+	CHECKHR(m_Contexts.Create());
+	
 	CHECKHR(m_Globals->Clear());
 
 	::CoFreeUnusedLibrariesEx(0, 0);
@@ -246,11 +286,7 @@ STDMETHODIMP CScriptEngine::ParseScriptText(
 	{
 		BSTR name = m_Names.GetAt(idx);
 		//DWORD dwFlags = SCRIPTITEM_ISVISIBLE | SCRIPTITEM_GLOBALMEMBERS;
-		DWORD dwFlags = SCRIPTITEM_ISVISIBLE;
-		if (_wcsicmp(name, L"Globals") == 0)
-		{
-			dwFlags |=  SCRIPTITEM_GLOBALMEMBERS;
-		}
+		DWORD dwFlags = m_Flags[name];
 		CHECKHR(spIActiveScript->AddNamedItem(name, dwFlags));
 	}
 
@@ -259,7 +295,6 @@ STDMETHODIMP CScriptEngine::ParseScriptText(
 	CComPtr<IActiveScriptParse> spIActiveScriptParse;
 	CHECKHR(spIActiveScript->QueryInterface(&spIActiveScriptParse));
 	CHECKHR(spIActiveScriptParse->InitNew());
-
 
 	CComVariant result;
 	EXCEPINFO ei = { };
@@ -357,24 +392,34 @@ STDMETHODIMP CScriptEngine::Import(BSTR Path, BSTR Name, BSTR Language)
 	CComBSTR ScriptText;
 	CHECKHR(LoadScript(Path, &ScriptText));
 
+	if (!Language || !*Language)
+	{
+		if (wcsstr(Path, L".js"))
+		{
+			Language = (BSTR) JScript;
+		}
+		else
+		{
+			Language = (BSTR) VBScript;
+		}
+	}
 	return ImportScript((BSTR) ScriptText, Path, Name, Language);
 }
 
 //
 
-STDMETHODIMP CScriptEngine::ImportScript(BSTR scriptText, BSTR Context, BSTR name, BSTR Language)
+STDMETHODIMP CScriptEngine::ImportScript(BSTR scriptText, BSTR Context, BSTR name, BSTR Language, DWORD dwNameFlags)
 {
 	HRESULT hr = S_OK;
 
-	LONG Index = -1;
-	CHECKHR(SetItem(name, NULL, &Index));
+	DWORD dwSourceContextCookie = 0;
+	CHECKHR(SetContext(Context, &dwSourceContextCookie));
 
 	LPCOLESTR pstrCode = (LPCOLESTR) scriptText;
 	LPCOLESTR pstrLanguage = (LPCOLESTR) Language;
     LPCOLESTR pstrItemName = (LPCOLESTR) NULL;
     IUnknown *punkContext = NULL;
     LPCOLESTR pstrDelimiter = NULL;
-	DWORD dwSourceContextCookie = Index;
     ULONG ulStartingLineNumber = 0;
     DWORD dwFlags = SCRIPTTEXT_ISVISIBLE;
 	CComVariant result;
@@ -386,8 +431,13 @@ STDMETHODIMP CScriptEngine::ImportScript(BSTR scriptText, BSTR Context, BSTR nam
 	CComPtr<IDispatch> spIDispatch;
 	CHECKHR(spIActiveScript->GetScriptDispatch(NULL, &spIDispatch));
 
-	//CHECKHR(SetItem(name, &CComVariant((IDispatch*) spIDispatch)));
-	CHECKHR(AddGlobal(spIDispatch));
+	if ((!name || !*name) || (dwNameFlags & SCRIPTITEM_GLOBALMEMBERS))
+	{
+		CHECKHR(AddGlobal(spIDispatch));
+		return hr;
+	}
+
+	CHECKHR(SetItem(name, &CComVariant((IDispatch*) spIDispatch), dwNameFlags));
 
 	return hr;
 }
@@ -468,6 +518,18 @@ STDMETHODIMP CScriptEngine::RunScript(BSTR Path, BSTR Language)
 	HRESULT hr = S_OK;
 	BOOL ok = TRUE;
 
+	if (!Language || !*Language)
+	{
+		if (wcsstr(Path, L".js"))
+		{
+			Language = (BSTR)JScript;
+		}
+		else
+		{
+			Language = (BSTR)VBScript;
+		}
+	}
+
 	CComBSTR ScriptText;
 	CHECKHR(LoadScript(Path, &ScriptText));
 
@@ -499,7 +561,7 @@ STDMETHODIMP CScriptEngine::RunScript(BSTR Path, BSTR Language)
 	return S_OK;
 }
 
-STDMETHODIMP CScriptEngine::SetItem(BSTR Name, VARIANT* Object, LONG* Index)
+STDMETHODIMP CScriptEngine::SetItem(BSTR Name, VARIANT* Object, DWORD dwFlags, LONG* Index)
 {
 	HRESULT hr = S_OK;
 
@@ -518,11 +580,10 @@ STDMETHODIMP CScriptEngine::SetItem(BSTR Name, VARIANT* Object, LONG* Index)
 	if (Index) *Index = m_Names.GetCount();
 	m_Names.Add(Name);
 	m_Values.Add(Object ? *Object : CComVariant());
+	m_Flags.SetAt(Name, dwFlags);
 
 	if (m_CurrentScript)
 	{
-		//DWORD dwFlags = SCRIPTITEM_ISVISIBLE | SCRIPTITEM_GLOBALMEMBERS;
-		DWORD dwFlags = SCRIPTITEM_ISVISIBLE;
 		CHECKHR(m_CurrentScript->AddNamedItem(Name, dwFlags));
 	}
 

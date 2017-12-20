@@ -21,6 +21,7 @@
 #include <atlctl.h>
 #include <activscp.h>
 #include <atlsafe.h>
+#include <atlcoll.h>
 
 #define CHECKHR(stmt) \
 	hr = (stmt); \
