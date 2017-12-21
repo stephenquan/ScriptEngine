@@ -98,6 +98,8 @@ public:
 	STDMETHOD(Import)(BSTR Path, BSTR Language);
 	STDMETHOD(ImportScript)(BSTR ScriptText, BSTR Context, BSTR Language);
 	STDMETHOD(LoadTextFile)(BSTR Path, BSTR* Text);
+	STDMETHOD(Load)(BSTR Path, BSTR Language, IDispatch** Object);
+	STDMETHOD(LoadScriptText)(BSTR ScriptText, BSTR Context, BSTR Language, IDispatch** Object);
 	STDMETHOD(RunScript)(BSTR Path, BSTR Language);
 	STDMETHOD(SetItem)(BSTR Name, VARIANT* Object = NULL, DWORD dwFlags = SCRIPTTEXT_ISVISIBLE, LONG* Index = NULL);
 	STDMETHOD(SetWindow)(OLE_HANDLE hWnd);

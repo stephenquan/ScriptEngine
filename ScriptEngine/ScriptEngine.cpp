@@ -416,6 +416,28 @@ STDMETHODIMP CScriptEngine::ImportScript(BSTR scriptText, BSTR Context, BSTR Lan
 	return hr;
 }
 
+STDMETHODIMP CScriptEngine::Load(BSTR Path, BSTR Language, IDispatch** Object)
+{
+	HRESULT hr = S_OK;
+	CComBSTR ScriptText;
+	CHECKHR(LoadTextFile(Path, &ScriptText));
+	CHECKHR(LoadScriptText((BSTR)ScriptText, Path, GetLanguage(Path, Language), Object));
+	return hr;
+}
+
+STDMETHODIMP CScriptEngine::LoadScriptText(BSTR scriptText, BSTR Context, BSTR Language, IDispatch** Object)
+{
+	HRESULT hr = S_OK;
+
+	DWORD dwFlags = SCRIPTTEXT_ISVISIBLE;
+	CComVariant result;
+	EXCEPINFO ei = {};
+	CComPtr<IActiveScript> spIActiveScript;
+	CHECKHR(ParseScriptText(scriptText, Language, Context, dwFlags, &result, &ei, &spIActiveScript));
+	CHECKHR(spIActiveScript->GetScriptDispatch(NULL, Object));
+	return hr;
+}
+
 STDMETHODIMP CScriptEngine::LoadTextFile(BSTR Path, BSTR* Text)
 {
 	HRESULT hr = S_OK;

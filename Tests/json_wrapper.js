@@ -1,4 +1,4 @@
-function json_parse(str)
+function parse(str)
 {
   try {
     return JSON.parse(str);
@@ -12,7 +12,7 @@ function json_parse(str)
   }
 }
 
-function json_stringify(obj)
+function stringify(obj)
 {
   return JSON.stringify(obj, undefined, 2);
 }
