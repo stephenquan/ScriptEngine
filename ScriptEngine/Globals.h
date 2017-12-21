@@ -20,10 +20,12 @@ public:
 
 	// Misc
 	STDMETHOD(Clear)();
-	STDMETHOD(AddItem)(IDispatch* item);
+	STDMETHOD(AddItem)(const VARIANT& item);
+
+	static HRESULT GetDispatch(const VARIANT& item, IDispatch** ppIDispatch);
 
 protected:
 	LONG m_Ref;
-	CComSafeArray<IDispatch*> m_Items;
+	CComSafeArray<VARIANT> m_Items;
 
 };

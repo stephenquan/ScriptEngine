@@ -66,16 +66,13 @@ public:
 	STDMETHOD(ParseScriptText)(
 		LPCOLESTR pstrCode,
 		LPCOLESTR pstrLanguage,
-        LPCOLESTR pstrItemName,
-        IUnknown *punkContext,
-        LPCOLESTR pstrDelimiter,
-        DWORD dwSourceContextCookie,
-        ULONG ulStartingLineNumber,
+        LPCOLESTR pstrContext,
         DWORD dwFlags,
         VARIANT *pvarResult,
         EXCEPINFO *pexcepinfo,
 		IActiveScript** ppIActiveScript);
-	STDMETHOD(AddGlobal)(IDispatch* item) { return m_Globals->AddItem(item); }
+
+	STDMETHOD(AddGlobal)(const VARIANT &item) { return m_Globals->AddItem(item); }
 
 	static CComBSTR VBScript;
 	static CComBSTR JScript;
@@ -92,14 +89,15 @@ protected:
 	CGlobals* m_Globals;
 
 public:
-	STDMETHOD(SetContext)(BSTR Context, DWORD* dwContext = NULL);
+	static BSTR GetLanguage(BSTR Path, BSTR Language);
+	STDMETHOD(SetContext)(LPCOLESTR Context, DWORD* dwContext = NULL);
 	STDMETHOD(Clear)();
 	STDMETHOD(CoFree)();
 	STDMETHOD(Evaluate)(BSTR ScriptText, BSTR Language, VARIANT* Result);
 	STDMETHOD(Execute)(BSTR ScriptText, BSTR Language);
-	STDMETHOD(Import)(BSTR Path, BSTR Name, BSTR Language);
-	STDMETHOD(ImportScript)(BSTR ScriptText, BSTR Context, BSTR Name, BSTR Language, DWORD dwNameFlags = SCRIPTTEXT_ISVISIBLE);
-	STDMETHOD(LoadScript)(BSTR Path, BSTR* ScriptText);
+	STDMETHOD(Import)(BSTR Path, BSTR Language);
+	STDMETHOD(ImportScript)(BSTR ScriptText, BSTR Context, BSTR Language);
+	STDMETHOD(LoadTextFile)(BSTR Path, BSTR* Text);
 	STDMETHOD(RunScript)(BSTR Path, BSTR Language);
 	STDMETHOD(SetItem)(BSTR Name, VARIANT* Object = NULL, DWORD dwFlags = SCRIPTTEXT_ISVISIBLE, LONG* Index = NULL);
 	STDMETHOD(SetWindow)(OLE_HANDLE hWnd);

@@ -40,7 +40,7 @@ HRESULT CScriptEngine::FinalConstruct()
 	//CHECKHR(SetItem(CComBSTR("Engine"), &CComVariant((IDispatch*) this)));
 	DWORD dwFlags = SCRIPTITEM_ISVISIBLE | SCRIPTITEM_GLOBALMEMBERS;
 	CHECKHR(SetItem(CComBSTR("Globals"), &CComVariant(m_Globals), dwFlags));
-	CHECKHR(AddGlobal(this));
+	CHECKHR(AddGlobal(CComVariant(this)));
 	return S_OK;
 }
 
@@ -52,7 +52,7 @@ void CScriptEngine::FinalRelease()
 
 // IActiveScriptSite
 
-STDMETHODIMP CScriptEngine::SetContext(BSTR Context, DWORD* dwContext)
+STDMETHODIMP CScriptEngine::SetContext(LPCOLESTR Context, DWORD* dwContext)
 {
 	HRESULT hr = S_OK;
 
@@ -79,7 +79,7 @@ STDMETHODIMP CScriptEngine::SetContext(BSTR Context, DWORD* dwContext)
 		*dwContext = m_Contexts.GetCount() + 256;
 	}
 
-	CHECKHR(m_Contexts.Add(Context));
+	CHECKHR(m_Contexts.Add(CComBSTR(Context)));
 
 	return S_OK;
 }
@@ -146,7 +146,8 @@ STDMETHODIMP CScriptEngine::OnScriptError(IActiveScriptError *pIActiveScriptErro
 	LONG lCharacterPosition = 0;
 	hr = pIActiveScriptError->GetSourcePosition(&dwSourceContext, &ulLineNumber, &lCharacterPosition);
 
-	m_ErrorString.Append(m_Names.GetAt(dwSourceContext));
+	BSTR name = (dwSourceContext >= 256) ? m_Contexts.GetAt(dwSourceContext - 256) : NULL;
+	m_ErrorString.Append(name);
 	::wsprintf(szText, L"(%d, %d)", ulLineNumber + 1, lCharacterPosition + 1);
 	m_ErrorString.Append(szText);
 
@@ -162,11 +163,26 @@ STDMETHODIMP CScriptEngine::OnScriptError(IActiveScriptError *pIActiveScriptErro
 		m_ErrorString.Append(ei.bstrDescription);
 	}
 
+	CComBSTR bstrSourceLine;
+	CHECKHR(pIActiveScriptError->GetSourceLineText(&bstrSourceLine));
+	if ((BSTR) bstrSourceLine)
+	{
+		m_ErrorString.Append(L": ");
+		m_ErrorString.Append((BSTR) bstrSourceLine);
+	}
+
 	m_Error = ei.scode;
 
 	OutputDebugStringW((BSTR) m_ErrorString);
 	OutputDebugStringW(L"\r\n");
 	//wprintf(L"%s\n", (BSTR) m_ErrorString);
+
+	CComPtr<ICreateErrorInfo> spICreateErrorInfo;
+	CHECKHR(CreateErrorInfo(&spICreateErrorInfo));
+	spICreateErrorInfo->SetDescription((BSTR) m_ErrorString);
+	CComPtr<IErrorInfo> spIErrorInfo;
+	spICreateErrorInfo->QueryInterface(IID_IErrorInfo, (void**) &spIErrorInfo);
+	SetErrorInfo(0, spIErrorInfo);
 
 	if (m_hWnd)
 	{
@@ -248,14 +264,12 @@ STDMETHODIMP CScriptEngine::CoFree()
 	return S_OK;
 }
 
+//
+
 STDMETHODIMP CScriptEngine::ParseScriptText(
 	LPCOLESTR pstrCode,
 	LPCOLESTR pstrLanguage,
-    LPCOLESTR pstrItemName,
-    IUnknown *punkContext,
-    LPCOLESTR pstrDelimiter,
-    DWORD dwSourceContextCookie,
-    ULONG ulStartingLineNumber,
+    LPCOLESTR pstrContext,
     DWORD dwFlags,
     VARIANT *pvarResult,
     EXCEPINFO *pexcepinfo,
@@ -286,8 +300,8 @@ STDMETHODIMP CScriptEngine::ParseScriptText(
 	{
 		BSTR name = m_Names.GetAt(idx);
 		//DWORD dwFlags = SCRIPTITEM_ISVISIBLE | SCRIPTITEM_GLOBALMEMBERS;
-		DWORD dwFlags = m_Flags[name];
-		CHECKHR(spIActiveScript->AddNamedItem(name, dwFlags));
+		DWORD dwNameFlags = m_Flags[name];
+		CHECKHR(spIActiveScript->AddNamedItem(name, dwNameFlags));
 	}
 
 	m_CurrentScript = spIActiveScript;
@@ -295,6 +309,14 @@ STDMETHODIMP CScriptEngine::ParseScriptText(
 	CComPtr<IActiveScriptParse> spIActiveScriptParse;
 	CHECKHR(spIActiveScript->QueryInterface(&spIActiveScriptParse));
 	CHECKHR(spIActiveScriptParse->InitNew());
+
+    LPCOLESTR pstrItemName = NULL;
+    DWORD dwSourceContextCookie = 0;
+    ULONG ulStartingLineNumber = 0;
+    IUnknown *punkContext = NULL;
+    LPCOLESTR pstrDelimiter = NULL;
+
+	CHECKHR(SetContext(pstrContext, &dwSourceContextCookie));
 
 	CComVariant result;
 	EXCEPINFO ei = { };
@@ -331,18 +353,11 @@ STDMETHODIMP CScriptEngine::Evaluate(BSTR ScriptText, BSTR Language, VARIANT* Re
 		VariantInit(Result);
 	}
 
-	LPCOLESTR pstrCode = (LPCOLESTR) ScriptText;
-	LPCOLESTR pstrLanguage = (LPCOLESTR) Language;
-    LPCOLESTR pstrItemName = (LPCOLESTR) NULL;
-    IUnknown *punkContext = NULL;
-    LPCOLESTR pstrDelimiter = NULL;
-    DWORD dwSourceContextCookie = 0;
-    ULONG ulStartingLineNumber = 0;
+	CComBSTR bstrContext("SCRIPT");
 	DWORD dwFlags = SCRIPTTEXT_ISEXPRESSION;
-
 	EXCEPINFO ei = { };
 	CComPtr<IActiveScript> spIActiveScript;
-	CHECKHR(ParseScriptText(pstrCode, pstrLanguage, pstrItemName, punkContext, pstrDelimiter, dwSourceContextCookie, ulStartingLineNumber, dwFlags, Result, &ei, &spIActiveScript));
+	CHECKHR(ParseScriptText(ScriptText, Language, (BSTR) bstrContext, dwFlags, Result, &ei, &spIActiveScript));
 
 	CHECKHR(spIActiveScript->Close());
 
@@ -360,19 +375,12 @@ STDMETHODIMP CScriptEngine::Execute(BSTR ScriptText, BSTR Language)
 {
 	HRESULT hr = S_OK;
 
-	LPCOLESTR pstrCode = (LPCOLESTR) ScriptText;
-	LPCOLESTR pstrLanguage = (LPCOLESTR) Language;
-    LPCOLESTR pstrItemName = (LPCOLESTR) NULL;
-    IUnknown *punkContext = NULL;
-    LPCOLESTR pstrDelimiter = NULL;
-    DWORD dwSourceContextCookie = 0;
-    ULONG ulStartingLineNumber = 0;
-	DWORD dwFlags = 0;
+	CComBSTR bstrContext("SCRIPT");
 	CComVariant result;
-
+	DWORD dwFlags = 0;
 	EXCEPINFO ei = { };
 	CComPtr<IActiveScript> spIActiveScript;
-	CHECKHR(ParseScriptText(pstrCode, pstrLanguage, pstrItemName, punkContext, pstrDelimiter, dwSourceContextCookie, ulStartingLineNumber, dwFlags, &result, &ei, &spIActiveScript));
+	CHECKHR(ParseScriptText(ScriptText, Language, (BSTR) bstrContext, dwFlags, &result, &ei, &spIActiveScript));
 
 	CHECKHR(spIActiveScript->Close());
 
@@ -384,71 +392,37 @@ STDMETHODIMP CScriptEngine::Execute(BSTR ScriptText, BSTR Language)
 
 //
 
-STDMETHODIMP CScriptEngine::Import(BSTR Path, BSTR Name, BSTR Language)
+STDMETHODIMP CScriptEngine::Import(BSTR Path, BSTR Language)
 {
 	HRESULT hr = S_OK;
-	BOOL ok = TRUE;
-
 	CComBSTR ScriptText;
-	CHECKHR(LoadScript(Path, &ScriptText));
-
-	if (!Language || !*Language)
-	{
-		if (wcsstr(Path, L".js"))
-		{
-			Language = (BSTR) JScript;
-		}
-		else
-		{
-			Language = (BSTR) VBScript;
-		}
-	}
-	return ImportScript((BSTR) ScriptText, Path, Name, Language);
+	CHECKHR(LoadTextFile(Path, &ScriptText));
+	CHECKHR(ImportScript((BSTR) ScriptText, Path, GetLanguage(Path, Language)));
+	return hr;
 }
 
 //
 
-STDMETHODIMP CScriptEngine::ImportScript(BSTR scriptText, BSTR Context, BSTR name, BSTR Language, DWORD dwNameFlags)
+STDMETHODIMP CScriptEngine::ImportScript(BSTR scriptText, BSTR Context, BSTR Language)
 {
 	HRESULT hr = S_OK;
 
-	DWORD dwSourceContextCookie = 0;
-	CHECKHR(SetContext(Context, &dwSourceContextCookie));
-
-	LPCOLESTR pstrCode = (LPCOLESTR) scriptText;
-	LPCOLESTR pstrLanguage = (LPCOLESTR) Language;
-    LPCOLESTR pstrItemName = (LPCOLESTR) NULL;
-    IUnknown *punkContext = NULL;
-    LPCOLESTR pstrDelimiter = NULL;
-    ULONG ulStartingLineNumber = 0;
     DWORD dwFlags = SCRIPTTEXT_ISVISIBLE;
 	CComVariant result;
 	EXCEPINFO ei = { };
 	CComPtr<IActiveScript> spIActiveScript;
-
-	CHECKHR(ParseScriptText(pstrCode, pstrLanguage, pstrItemName, punkContext, pstrDelimiter, dwSourceContextCookie, ulStartingLineNumber, dwFlags, &result, &ei, &spIActiveScript));
-
-	CComPtr<IDispatch> spIDispatch;
-	CHECKHR(spIActiveScript->GetScriptDispatch(NULL, &spIDispatch));
-
-	if ((!name || !*name) || (dwNameFlags & SCRIPTITEM_GLOBALMEMBERS))
-	{
-		CHECKHR(AddGlobal(spIDispatch));
-		return hr;
-	}
-
-	CHECKHR(SetItem(name, &CComVariant((IDispatch*) spIDispatch), dwNameFlags));
-
+	CHECKHR(ParseScriptText(scriptText, Language, Context, dwFlags, &result, &ei, &spIActiveScript));
+	CHECKHR(AddGlobal(CComVariant(spIActiveScript)));
 	return hr;
 }
 
-STDMETHODIMP CScriptEngine::LoadScript(BSTR Path, BSTR* ScriptText)
+STDMETHODIMP CScriptEngine::LoadTextFile(BSTR Path, BSTR* Text)
 {
 	HRESULT hr = S_OK;
 	BOOL ok = TRUE;
 
-	if (!ScriptText) return E_INVALIDARG;
-	*ScriptText = NULL;
+	if (!Text) return E_INVALIDARG;
+	*Text = NULL;
 
 	LPCWSTR lpFileName = Path;
 	DWORD dwDesiredAccess = GENERIC_READ;
@@ -508,7 +482,7 @@ STDMETHODIMP CScriptEngine::LoadScript(BSTR Path, BSTR* ScriptText)
 
 	::MultiByteToWideChar(CodePage, 0, (LPCSTR) pBytesA, nLenA, (BSTR) bytesW, nLenW);
 
-	*ScriptText = bytesW.Detach();
+	*Text = bytesW.Detach();
 
 	return S_OK;
 }
@@ -518,34 +492,14 @@ STDMETHODIMP CScriptEngine::RunScript(BSTR Path, BSTR Language)
 	HRESULT hr = S_OK;
 	BOOL ok = TRUE;
 
-	if (!Language || !*Language)
-	{
-		if (wcsstr(Path, L".js"))
-		{
-			Language = (BSTR)JScript;
-		}
-		else
-		{
-			Language = (BSTR)VBScript;
-		}
-	}
-
 	CComBSTR ScriptText;
-	CHECKHR(LoadScript(Path, &ScriptText));
+	CHECKHR(LoadTextFile(Path, &ScriptText));
 
-	LPCOLESTR pstrCode = (LPCOLESTR) ScriptText;
-	LPCOLESTR pstrLanguage = (LPCOLESTR) Language;
-    LPCOLESTR pstrItemName = (LPCOLESTR) NULL;
-    IUnknown *punkContext = NULL;
-    LPCOLESTR pstrDelimiter = NULL;
-    DWORD dwSourceContextCookie = 0;
-    ULONG ulStartingLineNumber = 0;
 	DWORD dwFlags = SCRIPTTEXT_ISVISIBLE;
 	CComVariant result;
-
 	EXCEPINFO ei = { };
 	CComPtr<IActiveScript> spIActiveScript;
-	CHECKHR(ParseScriptText(pstrCode, pstrLanguage, pstrItemName, punkContext, pstrDelimiter, dwSourceContextCookie, ulStartingLineNumber, dwFlags, &result, &ei, &spIActiveScript));
+	CHECKHR(ParseScriptText((BSTR) ScriptText, GetLanguage(Path, Language), Path, dwFlags, &result, &ei, &spIActiveScript));
 
 	if (spIActiveScript)
 	{
@@ -553,7 +507,7 @@ STDMETHODIMP CScriptEngine::RunScript(BSTR Path, BSTR Language)
 		spIActiveScript = NULL;
 	}
 
-	CHECKHR(Clear());
+	//CHECKHR(Clear());
 
 	::CoFreeUnusedLibrariesEx(0, NULL);
 	::CoFreeUnusedLibrariesEx(0, NULL);
@@ -595,4 +549,21 @@ STDMETHODIMP CScriptEngine::SetWindow(OLE_HANDLE hWnd)
 	m_hWnd = (HWND) hWnd;
 	return S_OK;
 }
+
+BSTR CScriptEngine::GetLanguage(BSTR Path, BSTR Language)
+{
+	if (!Language || !*Language)
+	{
+		if (wcsstr(Path, L".js"))
+		{
+			Language = (BSTR) JScript;
+		}
+		else
+		{
+			Language = (BSTR) VBScript;
+		}
+	}
+	return Language;
+}
+
 

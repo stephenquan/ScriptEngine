@@ -39,12 +39,12 @@ library ScriptEngineLib
 		[id(2)] HRESULT CoFree();
 		[id(3)] HRESULT Evaluate([in] BSTR ScriptText, [in] BSTR Language, [out,retval] VARIANT* Result);
 		[id(4)] HRESULT Execute([in] BSTR ScriptText, [in] BSTR Language);
-		[id(5)] HRESULT Import([in] BSTR Path, [in, defaultvalue("")] BSTR Name, [in, defaultvalue("")] BSTR Language);
-		[id(6)] HRESULT ImportScript([in] BSTR ScriptText, [in, defaultvalue("")] BSTR Context, [in, defaultvalue("")] BSTR Name, [in, defaultvalue("")] BSTR Language, [in, defaultvalue(2)] DWORD dwNameFlags);
+		[id(5)] HRESULT Import([in] BSTR Path, [in, defaultvalue("")] BSTR Language);
+		//[id(6)] HRESULT ImportScript([in] BSTR ScriptText, [in, defaultvalue("")] BSTR Context, [in, defaultvalue("")] BSTR Language);
 		[id(7)] HRESULT RunScript([in] BSTR Path, [in,defaultvalue("")] BSTR Language);
 		[id(8)] HRESULT SetItem([in] BSTR Name, [in] VARIANT* Object, [in, defaultvalue(2)] DWORD dwFlags, [out,retval] LONG* Index);
 		[id(9)] HRESULT SetWindow([in] OLE_HANDLE hWnd);
-		[id(10)] HRESULT AddGlobal([in] IDispatch* item);
+		//[id(10)] HRESULT AddGlobal([in] IDispatch* item);
 	};
 
 	//----------------------------------------------------------------------
