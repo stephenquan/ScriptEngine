@@ -72,7 +72,7 @@ public:
         EXCEPINFO *pexcepinfo,
 		IActiveScript** ppIActiveScript);
 
-	STDMETHOD(AddGlobal)(const VARIANT &item) { return m_Globals->AddItem(item); }
+	STDMETHOD(AddGlobal)(VARIANT *item) { return m_Globals->AddItem(*item); }
 
 	static CComBSTR VBScript;
 	static CComBSTR JScript;

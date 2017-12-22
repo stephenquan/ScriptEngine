@@ -40,7 +40,7 @@ HRESULT CScriptEngine::FinalConstruct()
 	//CHECKHR(SetItem(CComBSTR("Engine"), &CComVariant((IDispatch*) this)));
 	DWORD dwFlags = SCRIPTITEM_ISVISIBLE | SCRIPTITEM_GLOBALMEMBERS;
 	CHECKHR(SetItem(CComBSTR("Globals"), &CComVariant(m_Globals), dwFlags));
-	CHECKHR(AddGlobal(CComVariant(this)));
+	CHECKHR(AddGlobal(&CComVariant(this)));
 	return S_OK;
 }
 
@@ -412,7 +412,7 @@ STDMETHODIMP CScriptEngine::ImportScript(BSTR scriptText, BSTR Context, BSTR Lan
 	EXCEPINFO ei = { };
 	CComPtr<IActiveScript> spIActiveScript;
 	CHECKHR(ParseScriptText(scriptText, Language, Context, dwFlags, &result, &ei, &spIActiveScript));
-	CHECKHR(AddGlobal(CComVariant(spIActiveScript)));
+	CHECKHR(AddGlobal(&CComVariant(spIActiveScript)));
 	return hr;
 }
 
