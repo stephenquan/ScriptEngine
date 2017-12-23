@@ -16,6 +16,7 @@ CScriptEngine::CScriptEngine() :
 	m_Names.Create();
 	m_Values.Create();
 	m_Contexts.Create();
+	m_Flags.Create();
 }
 
 STDMETHODIMP CScriptEngine::InterfaceSupportsErrorInfo(REFIID riid)
@@ -94,6 +95,16 @@ STDMETHODIMP CScriptEngine::GetItemInfo(LPCOLESTR pstrName, DWORD dwReturnMask, 
 {
 	HRESULT hr = S_OK;
 
+	if (ppiunkItem)
+	{
+		*ppiunkItem = NULL;
+	}
+
+	if (ppti)
+	{
+		*ppti = NULL;
+	}
+
 	for (ULONG idx = 0; idx < m_Names.GetCount() && idx < m_Values.GetCount(); idx++)
 	{
 		BSTR name = m_Names.GetAt(idx);
@@ -104,8 +115,15 @@ STDMETHODIMP CScriptEngine::GetItemInfo(LPCOLESTR pstrName, DWORD dwReturnMask, 
 			{
 				*ppiunkItem = NULL;
 				VARIANT& Value = m_Values.GetAt(idx);
-				if (Value.vt != VT_DISPATCH) return TYPE_E_ELEMENTNOTFOUND;
-				CHECKHR(V_DISPATCH(&Value)->QueryInterface(IID_IUnknown, (void**) ppiunkItem));
+				if (Value.vt != VT_DISPATCH)
+				{
+					return TYPE_E_ELEMENTNOTFOUND;
+				}
+				hr = V_DISPATCH(&Value)->QueryInterface(IID_IUnknown, (void**) ppiunkItem);
+				if (FAILED(hr))
+				{
+					return TYPE_E_ELEMENTNOTFOUND;
+				}
 			}
 
 			return S_OK;
@@ -245,9 +263,11 @@ STDMETHODIMP CScriptEngine::Clear()
 	CHECKHR(m_Names.Destroy());
 	CHECKHR(m_Values.Destroy());
 	CHECKHR(m_Contexts.Destroy());
+	CHECKHR(m_Flags.Destroy());
 	CHECKHR(m_Names.Create());
 	CHECKHR(m_Values.Create());
 	CHECKHR(m_Contexts.Create());
+	CHECKHR(m_Flags.Create());
 	
 	CHECKHR(m_Globals->Clear());
 
@@ -299,8 +319,9 @@ STDMETHODIMP CScriptEngine::ParseScriptText(
 	for (ULONG idx = 0; idx < m_Names.GetCount(); idx++)
 	{
 		BSTR name = m_Names.GetAt(idx);
-		//DWORD dwFlags = SCRIPTITEM_ISVISIBLE | SCRIPTITEM_GLOBALMEMBERS;
-		DWORD dwNameFlags = m_Flags[name];
+		DWORD dwFlags = SCRIPTITEM_ISVISIBLE;
+		//DWORD dwNameFlags = m_Flags[name];
+		DWORD dwNameFlags = m_Flags.GetAt(idx);
 		CHECKHR(spIActiveScript->AddNamedItem(name, dwNameFlags));
 	}
 
@@ -549,6 +570,7 @@ STDMETHODIMP CScriptEngine::SetItem(BSTR Name, VARIANT* Object, DWORD dwFlags, L
 		{
 			if (Index) *Index = (LONG) idx;
 			m_Values.SetAt(idx, Object ? *Object : CComVariant());
+			m_Flags.SetAt(idx, dwFlags);
 			return S_OK;
 		}
 	}
@@ -556,7 +578,8 @@ STDMETHODIMP CScriptEngine::SetItem(BSTR Name, VARIANT* Object, DWORD dwFlags, L
 	if (Index) *Index = m_Names.GetCount();
 	m_Names.Add(Name);
 	m_Values.Add(Object ? *Object : CComVariant());
-	m_Flags.SetAt(Name, dwFlags);
+	//m_Flags.SetAt(Name, dwFlags);
+	m_Flags.Add(dwFlags);
 
 	if (m_CurrentScript)
 	{

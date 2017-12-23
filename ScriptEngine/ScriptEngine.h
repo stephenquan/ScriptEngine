@@ -82,7 +82,7 @@ protected:
 	CComSafeArray<BSTR> m_Names;
 	CComSafeArray<VARIANT> m_Values;
 	CComSafeArray<BSTR> m_Contexts;
-	CAtlMap<BSTR, DWORD> m_Flags;
+	CComSafeArray<DWORD> m_Flags;
 	HRESULT m_Error;
 	CComBSTR m_ErrorString;
 	CComPtr<IActiveScript> m_CurrentScript;
