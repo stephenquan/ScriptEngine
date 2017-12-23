@@ -164,8 +164,8 @@ STDMETHODIMP CScriptEngine::OnScriptError(IActiveScriptError *pIActiveScriptErro
 	}
 
 	CComBSTR bstrSourceLine;
-	CHECKHR(pIActiveScriptError->GetSourceLineText(&bstrSourceLine));
-	if ((BSTR) bstrSourceLine)
+	hr = pIActiveScriptError->GetSourceLineText(&bstrSourceLine);
+	if (SUCCEEDED(hr) && (BSTR) bstrSourceLine)
 	{
 		m_ErrorString.Append(L": ");
 		m_ErrorString.Append((BSTR) bstrSourceLine);
