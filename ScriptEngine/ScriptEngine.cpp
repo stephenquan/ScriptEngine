@@ -17,6 +17,7 @@ CScriptEngine::CScriptEngine() :
 	m_Values.Create();
 	m_Contexts.Create();
 	m_Flags.Create();
+	m_ActiveScripts.Create();
 }
 
 STDMETHODIMP CScriptEngine::InterfaceSupportsErrorInfo(REFIID riid)
@@ -260,14 +261,34 @@ STDMETHODIMP CScriptEngine::Clear()
 		CHECKHR(VariantClear(&value));
 	}
 
+	for (ULONG idx = 0; idx < m_ActiveScripts.GetCount(); idx++)
+	{
+		VARIANT& value = m_ActiveScripts.GetAt(idx);
+		CComPtr<IActiveScript> spIActiveScript;
+		if (value.vt == VT_DISPATCH && V_DISPATCH(&value) && SUCCEEDED(hr = V_DISPATCH(&value)->QueryInterface(IID_IActiveScript, (void**) &spIActiveScript)))
+		{
+			CHECKHR(spIActiveScript->Close());
+			spIActiveScript = NULL;
+		}
+		if (value.vt == VT_UNKNOWN && V_UNKNOWN(&value) && SUCCEEDED(hr = V_UNKNOWN(&value)->QueryInterface(IID_IActiveScript, (void**) &spIActiveScript)))
+		{
+			CHECKHR(spIActiveScript->Close());
+			spIActiveScript = NULL;
+		}
+		CHECKHR(VariantClear(&value));
+	}
+
 	CHECKHR(m_Names.Destroy());
 	CHECKHR(m_Values.Destroy());
 	CHECKHR(m_Contexts.Destroy());
 	CHECKHR(m_Flags.Destroy());
+	CHECKHR(m_ActiveScripts.Destroy());
+
 	CHECKHR(m_Names.Create());
 	CHECKHR(m_Values.Create());
 	CHECKHR(m_Contexts.Create());
 	CHECKHR(m_Flags.Create());
+	CHECKHR(m_ActiveScripts.Create());
 	
 	CHECKHR(m_Globals->Clear());
 
@@ -455,6 +476,7 @@ STDMETHODIMP CScriptEngine::LoadScriptText(BSTR scriptText, BSTR Context, BSTR L
 	EXCEPINFO ei = {};
 	CComPtr<IActiveScript> spIActiveScript;
 	CHECKHR(ParseScriptText(scriptText, Language, Context, dwFlags, &result, &ei, &spIActiveScript));
+	m_ActiveScripts.Add(CComVariant((IUnknown*) spIActiveScript));
 	CHECKHR(spIActiveScript->GetScriptDispatch(NULL, Object));
 	return hr;
 }

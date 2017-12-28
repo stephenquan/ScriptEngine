@@ -87,6 +87,7 @@ protected:
 	CComBSTR m_ErrorString;
 	CComPtr<IActiveScript> m_CurrentScript;
 	CGlobals* m_Globals;
+	CComSafeArray<VARIANT> m_ActiveScripts;
 
 public:
 	static BSTR GetLanguage(BSTR Path, BSTR Language);
